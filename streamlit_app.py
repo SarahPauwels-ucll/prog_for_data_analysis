@@ -1,27 +1,17 @@
 import streamlit as st
+from st_pages import Page, add_page_title, show_pages
 import pandas as pd
 import os
 
 # Page configuration
 st.set_page_config(page_title="Station Data Dashboard", layout="wide")
 
-# Define the pages
-dashboard_page = st.Page(
-    "streamlit_app.py", 
-    title="Data Dashboard", 
-    icon="📊", 
-    default=True
+show_pages(
+    [
+        Page("streamlit_app.py", "data visualisation", ":books:"),
+        Page("pages/model.py", "model", ":robot_face:"),
+    ]
 )
-
-model_page = st.Page(
-    "pages/model.py", 
-    title="Model Prediction", 
-    icon="🤖"
-)
-
-# Initialize navigation
-pg = st.navigation([dashboard_page, model_page])
-pg.run()
 
 # Helper function to load data
 @st.cache_data
