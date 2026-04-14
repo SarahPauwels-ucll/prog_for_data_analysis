@@ -16,5 +16,8 @@ model_page = st.Page(
 
 # Initialize navigation
 pg = st.navigation([dashboard_page, model_page])
+pg.run()
+
+st.set_page_config(page_title="Model", layout="wide")
 
 st.title("🤖 Model Analysis")

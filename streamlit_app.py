@@ -5,8 +5,6 @@ import os
 # Page configuration
 st.set_page_config(page_title="Station Data Dashboard", layout="wide")
 
-import streamlit as st
-
 # Define the pages
 dashboard_page = st.Page(
     "streamlit_app.py", 
@@ -23,6 +21,7 @@ model_page = st.Page(
 
 # Initialize navigation
 pg = st.navigation([dashboard_page, model_page])
+pg.run()
 
 # Helper function to load data
 @st.cache_data
