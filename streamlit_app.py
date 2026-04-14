@@ -18,7 +18,7 @@ def load_data(file_path):
     return df
 
 # 1. Load the data
-data_path = os.path.join("data", "selected_combined.csv")
+data_path = os.path.join("data", "preprocesed.csv")
 df = load_data(data_path)
 
 if df is not None:
