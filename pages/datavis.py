@@ -45,6 +45,13 @@ if df is not None:
         
     )
 
+    polutants = ["PM2.5","PM10","SO2","NO2","CO", "O3"]
+    selected_polutant = st.sidebar.multiselect(
+        "Select Polutant to Display",
+        options=polutants,
+        default= ["PM2.5","PM10","SO2","NO2","CO", "O3"]
+    )
+
     # --- MAIN PAGE ---
     st.title(f"Dashboard: {selected_station}")
 
@@ -54,15 +61,23 @@ if df is not None:
 
     # 3. Filter the dataframe
     # We compare the .dt.date component to the slider's date objects
-    filtered_df = df[
+    selected_df = df[
         (df['station'] == selected_station) & 
         (df['datetime'].dt.date >= start_date) & 
         (df['datetime'].dt.date <= end_date)
     ].sort_values("datetime")
 
+    cols_to_show = ['datetime'] + selected_polutant
+    filtered_df = selected_df[cols_to_show]
+
     if not filtered_df.empty:
+        filtered_df = filtered_df.set_index('datetime')
+
+        #Graph
+        st.subheader("Pollutant Concentration Over Time")
+        st.line_chart(filtered_df)
         # Data Table
         st.subheader("Raw Data")
-        st.dataframe(filtered_df, use_container_width=True)
+        st.dataframe(filtered_df)
     else:
         st.warning("No data found for the selected station and date range.")
