@@ -18,6 +18,9 @@ def load_data(file_path):
 data_path = os.path.join("data", "preprocesed.csv")
 df = load_data(data_path)
 
+import pandas as pd
+import streamlit as st
+
 if df is not None:
     # --- SIDEBAR ---
     st.sidebar.header("Filter Settings")
@@ -26,25 +29,35 @@ if df is not None:
     stations = sorted(df['station'].unique())
     selected_station = st.sidebar.selectbox("Select a Station", stations)
 
-    # Datetime Selection
+    # 1. Get the min and max dates from the dataframe
+    # We convert to .date() to ensure the slider handles whole days
     min_date = df['datetime'].min().date()
     max_date = df['datetime'].max().date()
-    
-    selected_date = st.sidebar.date_input(
-        "Select Date",
-        value=min_date,
+
+    # 2. Use st.sidebar.slider for the range selection
+    # Providing a tuple to 'value' creates a range slider
+    selected_range = st.sidebar.slider(
+        "Select Date Range",
         min_value=min_date,
-        max_value=max_date
+        max_value=max_date,
+        value=(min_date, max_date),
+        format="YYYY-MM-DD",
+        
     )
 
     # --- MAIN PAGE ---
     st.title(f"Dashboard: {selected_station}")
-    st.markdown(f"Displaying data for **{selected_date}**")
 
-    # Filter the dataframe
+    # Unpack the tuple from the slider
+    start_date, end_date = selected_range
+    st.markdown(f"Displaying data from **{start_date}** to **{end_date}**")
+
+    # 3. Filter the dataframe
+    # We compare the .dt.date component to the slider's date objects
     filtered_df = df[
         (df['station'] == selected_station) & 
-        (df['datetime'].dt.date == selected_date)
+        (df['datetime'].dt.date >= start_date) & 
+        (df['datetime'].dt.date <= end_date)
     ].sort_values("datetime")
 
     if not filtered_df.empty:
@@ -52,4 +65,4 @@ if df is not None:
         st.subheader("Raw Data")
         st.dataframe(filtered_df, use_container_width=True)
     else:
-        st.warning("No data found for the selected station and date.")
+        st.warning("No data found for the selected station and date range.")
