@@ -18,9 +18,6 @@ def load_data(file_path):
 data_path = os.path.join("data", "preprocesed.csv")
 df = load_data(data_path)
 
-import pandas as pd
-import streamlit as st
-
 if df is not None:
     # --- SIDEBAR ---
     st.sidebar.header("Filter Settings")
@@ -46,38 +43,56 @@ if df is not None:
     )
 
     polutants = ["PM2.5","PM10","SO2","NO2","CO", "O3"]
-    selected_polutant = st.sidebar.multiselect(
+    selected_polutant = st.sidebar.radio(
         "Select Polutant to Display",
-        options=polutants,
-        default= ["PM2.5","PM10","SO2","NO2","CO", "O3"]
+        options=polutants
     )
 
-    # --- MAIN PAGE ---
+   # --- MAIN PAGE ---
     st.title(f"Dashboard: {selected_station}")
 
     # Unpack the tuple from the slider
     start_date, end_date = selected_range
-    st.markdown(f"Displaying data from **{start_date}** to **{end_date}**")
 
     # 3. Filter the dataframe
-    # We compare the .dt.date component to the slider's date objects
     selected_df = df[
         (df['station'] == selected_station) & 
         (df['datetime'].dt.date >= start_date) & 
         (df['datetime'].dt.date <= end_date)
     ].sort_values("datetime")
 
-    cols_to_show = ['datetime'] + selected_polutant
+    cols_to_show = ['datetime'] + [selected_polutant]
     filtered_df = selected_df[cols_to_show]
 
     if not filtered_df.empty:
+        # Set index to datetime to allow for resampling
         filtered_df = filtered_df.set_index('datetime')
 
-        #Graph
-        st.subheader("Pollutant Concentration Over Time")
+        # --- NEW LOGIC: Conditional Resampling ---
+        days_diff = (end_date - start_date).days
+        
+        if days_diff > 365:
+            st.markdown(f"Displaying **monthly average** from **{start_date}** to **{end_date}** (> 365 days selected)")
+            # Resample to Daily ('D') and take the mean
+            filtered_df = filtered_df.resample('M').mean()
+        elif days_diff > 120:
+            st.markdown(f"Displaying **weekly average** from **{start_date}** to **{end_date}** (> 120 days selected)")
+            # Resample to Daily ('D') and take the mean
+            filtered_df = filtered_df.resample('W').mean()
+        elif days_diff > 14:
+            st.markdown(f"Displaying **daily average** from **{start_date}** to **{end_date}** (> 14 days selected)")
+            # Resample to Daily ('D') and take the mean
+            filtered_df = filtered_df.resample('D').mean()
+        
+        else:
+            st.markdown(f"Displaying **raw data** from **{start_date}** to **{end_date}**")
+
+        # Graph
+        st.subheader(f"{selected_polutant} Concentration Over Time")
         st.line_chart(filtered_df)
+        
         # Data Table
-        st.subheader("Raw Data")
+        st.subheader("Data Table")
         st.dataframe(filtered_df)
     else:
         st.warning("No data found for the selected station and date range.")
