@@ -74,7 +74,7 @@ if df is not None:
         if days_diff > 365:
             st.markdown(f"Displaying **monthly average** from **{start_date}** to **{end_date}** (> 365 days selected)")
             # Resample to Daily ('D') and take the mean
-            filtered_df = filtered_df.resample('M').mean()
+            filtered_df = filtered_df.resample('ME').mean()
         elif days_diff > 120:
             st.markdown(f"Displaying **weekly average** from **{start_date}** to **{end_date}** (> 120 days selected)")
             # Resample to Daily ('D') and take the mean
