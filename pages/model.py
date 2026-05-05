@@ -2,6 +2,33 @@ import streamlit as st
 import pandas as pd
 import joblib
 from datetime import datetime
+import os
+@st.cache_data
+def load_data(file_path):
+    if not os.path.exists(file_path):
+        st.error(f"File not found: {file_path}")
+        return None
+    
+    df = pd.read_csv(file_path)
+    # Convert datetime column to actual datetime objects
+    df['datetime'] = pd.to_datetime(df['datetime'])
+    return df
+
+data_path = os.path.join("data", "preprocesed.csv")
+df = load_data(data_path)
+if df is not None:
+    # --- SIDEBAR ---
+    st.sidebar.header("Filter Settings")
+
+    # Station Selection
+    stations = sorted(df['station'].unique())
+    selected_station = st.sidebar.selectbox("Select a Station", stations)
+
+    polutants = ["PM2.5","PM10","SO2","NO2","CO", "O3"]
+    selected_polutant = st.sidebar.radio(
+        "Select Polutant to Display",
+        options=polutants
+    )
 
 # Load your saved joblib file
 @st.cache_resource
@@ -13,11 +40,10 @@ models = data['models']
 features = data['features']
 pollutants = data['pollutants']
 
-st.title("📅 Daily Air Quality Planner")
+st.title("📅 Air Quality Prediction")
 
 # 1. User Input: Date
-selected_date = st.date_input("Select a date for the forecast:",datetime(2018, 1, 1),min_value=datetime(2018, 1, 1),max_value=datetime(2018, 1, 31))
-
+selected_date = datetime(2017, 3, 1)
 # 2. Realistic Hardcoded Weather Patterns (24 values for each)
 # These simulate a standard day: cold morning, hot afternoon, cooling evening.
 weather_data_24h = {
@@ -32,63 +58,82 @@ weather_data_24h = {
              3.8, 4.0, 3.7, 3.2, 2.8, 2.2, 1.5, 1.2, 1.0, 0.9, 0.8, 0.8]
 }
 
-if st.button(f"Get Forecast for {selected_date}"):
-    # Starting point for rolling features
-    current_state = pd.DataFrame([{f: 0.0 for f in features}], columns=features)
-    
-    daily_results = []
-    
-    for hour in range(24):
-        # Update weather features from our hourly lists
-        for key in weather_data_24h.keys():
-            if key in features:
-                current_state[key] = weather_data_24h[key][hour]
+history_df = df[df['station'] == selected_station].sort_values('datetime').tail(24)
 
-        # Update the 'hour' feature
-        if 'hour' in features:
-            current_state['hour'] = hour
-            
-        step_preds = {'Hour': f"{hour:02d}:00"}
+# Create a dictionary to track the sliding windows for each pollutant
+# This stores the most recent 24 values for every pollutant
+pollutant_history = {p: history_df[p].tolist() for p in pollutants}
+
+# Initialize current_state with the correct feature columns
+current_state = pd.DataFrame(columns=features)
+
+daily_results = []
+
+# 2. Generate 24-Hour Forecast
+for hour in range(24):
+    row_data = {}
+    
+    # A. Inject Hardcoded Weather for the specific hour
+    for key in weather_data_24h.keys():
+        if key in features:
+            row_data[key] = weather_data_24h[key][hour]
+    
+    if 'hour' in features:
+        row_data['hour'] = hour
+
+    # B. Calculate Rolling Features (The "Seed" Data)
+    # As per model.py, we use the mean of the previous 'w' hours
+    for p in pollutants:
+        for w in [6, 24]:
+            col_name = f'{p}_roll_mean_{w}'
+            if col_name in features:
+                # Take the last 'w' values from our history buffer
+                recent_values = pollutant_history[p][-w:]
+                row_data[col_name] = sum(recent_values) / len(recent_values)
+
+    # Convert row_data to DataFrame for prediction
+    current_state = pd.DataFrame([row_data])
+    
+    # C. Predict all pollutants for this hour
+    step_preds = {'Hour': f"{hour:02d}:00"}
+    for p in pollutants:
+        val = models[p].predict(current_state)[0]
+        val = max(0, val) # Prevent negative pollution
+        step_preds[p] = val
         
-        for p in pollutants:
-            # Predict using the model for this specific pollutant
-            val = models[p].predict(current_state)[0]
-            step_preds[p] = max(0, val) # Ensure no negative values
-            
-            # Recursive Update: Feed prediction back into rolling mean for next hour
-            if f'{p}_roll_mean_6' in features:
-                current_state[f'{p}_roll_mean_6'] = val
-        
-        daily_results.append(step_preds)
+        # D. Update History Buffer for the NEXT hour
+        # We append the prediction so it's included in next hour's rolling mean
+        pollutant_history[p].append(val)
+        pollutant_history[p].pop(0) # Keep the buffer at exactly 24 items
+    
+    daily_results.append(step_preds)
 
-    # 4. Process Summary
-    df_daily = pd.DataFrame(daily_results)
-    
-    # Calculate means for the metrics
-    avg_pm25 = df_daily['PM2.5'].mean()
-    avg_o3 = df_daily['O3'].mean()
+# 3. Display Results
+df_daily = pd.DataFrame(daily_results)
 
-    # 5. Display Summary UI
-    st.subheader(f"Summary for {selected_date}")
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Avg PM2.5", f"{avg_pm25:.1f} µg/m³")
-    col2.metric("Avg Ozone", f"{avg_o3:.1f} µg/m³")
-    
-    if avg_pm25 < 35:
-        st.success("✅ The air quality is expected to be Good today.")
-    elif avg_pm25 < 75:
-        st.warning("⚠️ The air quality may be Moderate.")
-    else:
-        st.error("🚨 Air quality is expected to be Unhealthy.")
+# Metrics and Chart
+st.subheader(f"Summary for {selected_station} on {selected_date}")
+avg_pm25 = df_daily['PM2.5'].mean()
+avg_o3 = df_daily['O3'].mean()
 
-    # 6. Show the trend chart
-    st.subheader("Hourly Trends")
-    st.line_chart(df_daily.set_index('Hour')[['PM2.5', 'O3', 'NO2']])
-    
-    # Optional: Show the weather inputs used
-    with st.expander("View Simulated Weather Data"):
-        st.write("Below is the hourly weather data used for this prediction:")
-        weather_df = pd.DataFrame(weather_data_24h)
-        weather_df.index.name = 'Hour'
-        st.dataframe(weather_df)
+col1, col2 = st.columns(2)
+col1.metric("Avg PM2.5", f"{avg_pm25:.1f} µg/m³")
+col2.metric("Avg Ozone", f"{avg_o3:.1f} µg/m³")
+
+
+if avg_pm25 < 35:
+    st.success("✅ The air quality is expected to be Good today.")
+elif avg_pm25 < 75:
+    st.warning("⚠️ The air quality may be Moderate.")
+else:
+    st.error("🚨 Air quality is expected to be Unhealthy.")
+
+st.subheader(f"Hourly Trend: {selected_polutant}")
+st.line_chart(df_daily.set_index('Hour')[selected_polutant])
+
+# 4. Process Summary
+df_daily = pd.DataFrame(daily_results)
+
+# Calculate means for the metrics
+avg_pm25 = df_daily['PM2.5'].mean()
+avg_o3 = df_daily['O3'].mean()
