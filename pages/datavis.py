@@ -42,7 +42,7 @@ if df is not None:
         
     )
 
-    polutants = ["PM2.5","PM10","SO2","NO2","CO", "O3"]
+    polutants = ["PM25","PM10","SO2","NO2","CO", "O3"]
     selected_polutant = st.sidebar.radio(
         "Select Polutant to Display",
         options=polutants
@@ -62,6 +62,7 @@ if df is not None:
     ].sort_values("datetime")
 
     cols_to_show = ['datetime'] + [selected_polutant]
+
     filtered_df = selected_df[cols_to_show]
 
     if not filtered_df.empty:

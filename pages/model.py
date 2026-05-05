@@ -24,7 +24,7 @@ if df is not None:
     stations = sorted(df['station'].unique())
     selected_station = st.sidebar.selectbox("Select a Station", stations)
 
-    polutants = ["PM2.5","PM10","SO2","NO2","CO", "O3"]
+    polutants = ["PM25","PM10","SO2","NO2","CO", "O3"]
     selected_polutant = st.sidebar.radio(
         "Select Polutant to Display",
         options=polutants
@@ -135,5 +135,5 @@ st.line_chart(df_daily.set_index('Hour')[selected_polutant])
 df_daily = pd.DataFrame(daily_results)
 
 # Calculate means for the metrics
-avg_pm25 = df_daily['PM2.5'].mean()
+avg_pm25 = df_daily['PM25'].mean()
 avg_o3 = df_daily['O3'].mean()
