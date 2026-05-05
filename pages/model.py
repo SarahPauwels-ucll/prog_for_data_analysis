@@ -16,7 +16,7 @@ pollutants = data['pollutants']
 st.title("📅 Daily Air Quality Planner")
 
 # 1. User Input: Date
-selected_date = st.date_input("Select a date for the forecast:", datetime.now())
+selected_date = st.date_input("Select a date for the forecast:",datetime(2018, 1, 1),min_value=datetime(2018, 1, 1),max_value=datetime(2018, 1, 31))
 
 # 2. Realistic Hardcoded Weather Patterns (24 values for each)
 # These simulate a standard day: cold morning, hot afternoon, cooling evening.
