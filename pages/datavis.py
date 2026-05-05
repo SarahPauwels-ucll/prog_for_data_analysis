@@ -42,7 +42,7 @@ if df is not None:
         
     )
 
-    polutants = ["PM25","PM10","SO2","NO2","CO", "O3"]
+    polutants = ["PM2.5","PM10","SO2","NO2","CO", "O3"]
     selected_polutant = st.sidebar.radio(
         "Select Polutant to Display",
         options=polutants
@@ -90,7 +90,9 @@ if df is not None:
 
         # Graph
         st.subheader(f"{selected_polutant} Concentration Over Time")
-        st.line_chart(filtered_df)
+        filteredgraph_df = filtered_df.rename(columns={"PM2.5": "PM25"})
+        st.line_chart(filteredgraph_df)
+
         
         # Data Table
         st.subheader("Data Table")
