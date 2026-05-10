@@ -24,7 +24,7 @@ if df is not None:
     stations = sorted(df['station'].unique())
     selected_station = st.sidebar.selectbox("Select a Station", stations)
 
-    polutants = ["PM2.5","PM10","SO2","NO2","CO", "O3"]
+    polutants = ["PM2.5","SO2","NO2","CO", "O3"]
     selected_polutant = st.sidebar.radio(
         "Select Polutant to Display",
         options=polutants
