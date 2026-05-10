@@ -138,7 +138,7 @@ def calculate_china_iaqi(concentration, pollutant):
     return 500 # Cap at 500 if above scale
 
 
-st.subheader(f"Summary for {selected_station} on {selected_date.date}")
+st.subheader(f"Summary for {selected_station} on {selected_date}")
 
 
 # Note: PM10 = PM2.5 + PM2.5-10
