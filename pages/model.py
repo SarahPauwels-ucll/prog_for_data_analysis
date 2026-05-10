@@ -138,7 +138,7 @@ def calculate_china_iaqi(concentration, pollutant):
     return 500 # Cap at 500 if above scale
 
 
-st.subheader(f"Summary for {selected_station} on {selected_date}")
+st.subheader(f"Summary for {selected_station} on {selected_date.date}")
 
 
 # Note: PM10 = PM2.5 + PM2.5-10
@@ -169,15 +169,15 @@ col2.metric("Avg PM2.5", f"{avg_pm25:.1f} µg/m³")
 col3.metric("Max Ozone", f"{max_o3:.1f} µg/m³")
 
 
-if aqi_val <= 50:
+if aqi_val <= 51:
     st.success(f"✅ **AQI: {aqi_val:.0f} (Excellent)**. The air quality is satisfactory and poses little or no risk.")
-elif aqi_val <= 100:
+elif aqi_val <= 101:
     st.success(f"🟡 **AQI: {aqi_val:.0f} (Good)**. Air quality is acceptable; some pollutants may pose a moderate health concern for sensitive individuals.")
-elif aqi_val <= 150:
+elif aqi_val <= 151:
     st.warning(f"⚠️ **AQI: {aqi_val:.0f} (Lightly Polluted)**. Children and people with respiratory diseases should reduce outdoor exertion.")
-elif aqi_val <= 200:
+elif aqi_val <= 201:
     st.error(f"🚨 **AQI: {aqi_val:.0f} (Moderately Polluted)**. Healthy people may experience symptoms; sensitive groups should avoid outdoor activities.")
-elif aqi_val <= 300:
+elif aqi_val <= 301:
     st.error(f"🛑 **AQI: {aqi_val:.0f} (Heavily Polluted)**. General population should significantly reduce outdoor activities.")
 else:
     st.error(f"💀 **AQI: {aqi_val:.0f} (Severely Polluted)**. Everyone should avoid all outdoor activities.")
