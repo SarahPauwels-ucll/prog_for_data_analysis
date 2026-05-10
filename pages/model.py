@@ -24,10 +24,10 @@ if df is not None:
     stations = sorted(df['station'].unique())
     selected_station = st.sidebar.selectbox("Select a Station", stations)
 
-    polutants = ["PM2.5","SO2","NO2","CO", "O3"]
+    polutants = ["PM2.5","PM10","SO2","NO2","CO", "O3"]
     selected_polutant = st.sidebar.radio(
         "Select Polutant to Display",
-        options=polutants
+        options=["PM2.5","SO2","NO2","CO", "O3"]
     )
 
 # Load your saved joblib file
@@ -69,7 +69,7 @@ current_state = pd.DataFrame(columns=features)
 
 daily_results = []
 
-# 2. Generate 24-Hour Forecast
+# Generate 24-Hour Forecast
 for hour in range(24):
     row_data = {}
     
@@ -81,7 +81,7 @@ for hour in range(24):
     if 'hour' in features:
         row_data['hour'] = hour
 
-    # B. Calculate Rolling Features (The "Seed" Data)
+    # Calculate Rolling Features
     # As per model.py, we use the mean of the previous 'w' hours
     for p in pollutants:
         for w in [6, 24]:
@@ -94,7 +94,7 @@ for hour in range(24):
     # Convert row_data to DataFrame for prediction
     current_state = pd.DataFrame([row_data])
     
-    # C. Predict all pollutants for this hour
+    # Predict all pollutants for this hour
     step_preds = {'Hour': f"{hour:02d}:00"}
     for p in pollutants:
         val = models[p].predict(current_state)[0]
@@ -108,25 +108,81 @@ for hour in range(24):
     
     daily_results.append(step_preds)
 
-# 3. Display Results
+# Display Results
 df_daily = pd.DataFrame(daily_results)
 
-# Metrics and Chart
+def calculate_china_iaqi(concentration, pollutant):
+    """Calculates IAQI based on HJ 633-2012 Chinese Standard."""
+    # Breakpoints: [Concentration_Low, Concentration_High, IAQI_Low, IAQI_High]
+    breakpoints = {
+        'PM2.5': [(0, 35, 0, 50), (35, 75, 50, 100), (75, 115, 100, 150), 
+                  (115, 150, 150, 200), (150, 250, 200, 300), (250, 350, 300, 400), (350, 500, 400, 500)],
+        'PM10':  [(0, 50, 0, 50), (50, 150, 50, 100), (150, 250, 100, 150), 
+                  (250, 350, 150, 200), (350, 420, 200, 300), (420, 500, 300, 400), (500, 600, 400, 500)],
+        'SO2':   [(0, 50, 0, 50), (50, 150, 50, 100), (150, 475, 100, 150), 
+                  (475, 800, 150, 200), (800, 1600, 200, 300), (1600, 2100, 300, 400), (2100, 2620, 400, 500)],
+        'NO2':   [(0, 40, 0, 50), (40, 80, 50, 100), (80, 180, 100, 150), 
+                  (180, 280, 150, 200), (280, 565, 200, 300), (565, 750, 300, 400), (750, 940, 400, 500)],
+        'CO':    [(0, 2, 0, 50), (2, 4, 50, 100), (4, 14, 100, 150), 
+                  (14, 24, 150, 200), (24, 36, 200, 300), (36, 48, 300, 400), (48, 60, 400, 500)],
+        'O3':    [(0, 160, 0, 50), (160, 200, 50, 100), (200, 300, 100, 150), 
+                  (300, 400, 150, 200), (400, 800, 200, 300), (800, 1000, 300, 400), (1000, 1200, 400, 500)]
+    }
+    
+    if pollutant not in breakpoints:
+        return 0
+    
+    for (c_low, c_high, i_low, i_high) in breakpoints[pollutant]:
+        if c_low <= concentration <= c_high:
+            return ((i_high - i_low) / (c_high - c_low)) * (concentration - c_low) + i_low
+    return 500 # Cap at 500 if above scale
+
+
 st.subheader(f"Summary for {selected_station} on {selected_date}")
+
+
+# Note: PM10 = PM2.5 + PM2.5-10
 avg_pm25 = df_daily['PM2.5'].mean()
-avg_o3 = df_daily['O3'].mean()
+avg_pm10 = (df_daily['PM10']).mean()
+avg_so2 = df_daily['SO2'].mean()
+avg_no2 = df_daily['NO2'].mean()
+avg_co = df_daily['CO'].mean() / 1000.0  # Convert µg/m³ to mg/m³ for CO calculation
+max_o3 = df_daily['O3'].max()           # Ozone uses 1-hour max for AQI
 
-col1, col2 = st.columns(2)
-col1.metric("Avg PM2.5", f"{avg_pm25:.1f} µg/m³")
-col2.metric("Avg Ozone", f"{avg_o3:.1f} µg/m³")
+# 2. Calculate IAQI for each
+iaqis = {
+    "PM2.5": calculate_china_iaqi(avg_pm25, 'PM2.5'),
+    "PM10": calculate_china_iaqi(avg_pm10, 'PM10'),
+    "SO2": calculate_china_iaqi(avg_so2, 'SO2'),
+    "NO2": calculate_china_iaqi(avg_no2, 'NO2'),
+    "CO": calculate_china_iaqi(avg_co, 'CO'),
+    "O3": calculate_china_iaqi(max_o3, 'O3')
+}
+
+# 3. Final AQI is the maximum IAQI
+aqi_val = max(iaqis.values())
+
+# Display Main Metrics
+col1, col2, col3 = st.columns(3)
+col1.metric("China AQI", f"{aqi_val:.0f}")
+col2.metric("Avg PM2.5", f"{avg_pm25:.1f} µg/m³")
+col3.metric("Max Ozone", f"{max_o3:.1f} µg/m³")
 
 
-if avg_pm25 < 35:
-    st.success("✅ The air quality is expected to be Good today.")
-elif avg_pm25 < 75:
-    st.warning("⚠️ The air quality may be Moderate.")
+if aqi_val <= 50:
+    st.success(f"✅ **AQI: {aqi_val:.0f} (Excellent)**. The air quality is satisfactory and poses little or no risk.")
+elif aqi_val <= 100:
+    st.success(f"🟡 **AQI: {aqi_val:.0f} (Good)**. Air quality is acceptable; some pollutants may pose a moderate health concern for sensitive individuals.")
+elif aqi_val <= 150:
+    st.warning(f"⚠️ **AQI: {aqi_val:.0f} (Lightly Polluted)**. Children and people with respiratory diseases should reduce outdoor exertion.")
+elif aqi_val <= 200:
+    st.error(f"🚨 **AQI: {aqi_val:.0f} (Moderately Polluted)**. Healthy people may experience symptoms; sensitive groups should avoid outdoor activities.")
+elif aqi_val <= 300:
+    st.error(f"🛑 **AQI: {aqi_val:.0f} (Heavily Polluted)**. General population should significantly reduce outdoor activities.")
 else:
-    st.error("🚨 Air quality is expected to be Unhealthy.")
+    st.error(f"💀 **AQI: {aqi_val:.0f} (Severely Polluted)**. Everyone should avoid all outdoor activities.")
+
+
 
 st.subheader(f"Hourly Trend: {selected_polutant}")
 dailygraph_df = df_daily.rename(columns={"PM2.5": "PM25"})
@@ -134,9 +190,4 @@ if selected_polutant=="PM2.5":
     selected_polutant="PM25"
 st.line_chart(dailygraph_df.set_index('Hour')[selected_polutant])
 
-# 4. Process Summary
-df_daily = pd.DataFrame(daily_results)
 
-# Calculate means for the metrics
-avg_pm25 = df_daily['PM2.5'].mean()
-avg_o3 = df_daily['O3'].mean()
